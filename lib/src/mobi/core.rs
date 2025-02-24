@@ -48,7 +48,7 @@ impl MobiHtml {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct MobiNav {
     /// id，唯一
     pub(crate) id: usize,
@@ -283,6 +283,8 @@ use std::{
     sync::atomic::AtomicUsize,
 };
 
+use serde::Serialize;
+
 use crate::common::IResult;
 
 use super::{common::do_time_format, reader::MobiReader};
@@ -403,7 +405,7 @@ mod tests {
 
         println!("======");
 
-        assert_eq!(24,book.chapters.len());
+        assert_eq!(24, book.chapters.len());
         println!("{:?}", book.chapters[0]);
 
         println!("======");
@@ -411,7 +413,7 @@ mod tests {
         println!("{:?}", book.chapters[20]);
         println!("======");
 
-        assert_eq!(1,book.images.len());
+        assert_eq!(1, book.images.len());
         println!("======");
         for ele in &book.chapters {
             println!("{} {}", ele.title, ele.nav_id);
