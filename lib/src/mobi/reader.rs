@@ -485,7 +485,7 @@ where
 
 pub struct MobiReader<T> {
     reader: BufReader<T>,
-    pub(crate) mobiType: MobiFormat,
+    pub(crate) mobi_type: MobiFormat,
     pub(crate) pdb_header: PDBHeader,
     pub(crate) mobi_doc_header: MOBIDOCHeader,
     pub(crate) mobi_header: MOBIHeader,
@@ -508,7 +508,7 @@ impl<T: Read + Seek> MobiReader<T> {
 
         reader.seek(SeekFrom::Start(60))?;
         let version = reader.read_string(1)?;
-        let mobiType = match version.as_str() {
+        let mobi_type = match version.as_str() {
             "DH" => MobiFormat::MobiLegacy,
             "HK" => MobiFormat::Azw3,
             _ => MobiFormat::Unknown,
@@ -529,7 +529,7 @@ impl<T: Read + Seek> MobiReader<T> {
             mobi_doc_header,
             mobi_header,
             exth_header,
-            mobiType,
+            mobi_type,
             text_cache: None,
         })
     }
