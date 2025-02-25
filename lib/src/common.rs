@@ -26,6 +26,13 @@ pub enum IError {
     Unknown,
 }
 
+#[derive(Debug)]
+pub enum MobiFormat {
+    MobiLegacy,
+    Azw3,
+    Unknown,
+}
+
 impl std::fmt::Display for IError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{:?}", self)

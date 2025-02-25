@@ -10,7 +10,7 @@ use std::{
 };
 
 use crate::{
-    common::{BookInfo, IError, IResult},
+    common::{BookInfo, IError, IResult, MobiFormat},
     mobi::core::MobiNav,
 };
 
@@ -485,6 +485,7 @@ where
 
 pub struct MobiReader<T> {
     reader: BufReader<T>,
+    pub(crate) mobiType: MobiFormat,
     pub(crate) pdb_header: PDBHeader,
     pub(crate) mobi_doc_header: MOBIDOCHeader,
     pub(crate) mobi_header: MOBIHeader,
@@ -504,6 +505,15 @@ impl<T: Read + Seek> MobiReader<T> {
         if reader.read_string(8)? != "BOOKMOBI" {
             return Err(IError::InvalidArchive("not a mobi"));
         }
+
+        reader.seek(SeekFrom::Start(60))?;
+        let version = reader.read_string(1)?;
+        let mobiType = match version.as_str() {
+            "DH" => MobiFormat::MobiLegacy,
+            "HK" => MobiFormat::Azw3,
+            _ => MobiFormat::Unknown,
+        };
+
         reader.seek(SeekFrom::Start(0))?;
 
         let pdb_header = PDBHeader::load(&mut reader)?;
@@ -519,6 +529,7 @@ impl<T: Read + Seek> MobiReader<T> {
             mobi_doc_header,
             mobi_header,
             exth_header,
+            mobiType,
             text_cache: None,
         })
     }
