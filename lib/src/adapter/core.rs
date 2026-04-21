@@ -349,7 +349,10 @@ pub fn epub_to_mobi(epub: &mut EpubBook) -> IResult<MobiBook> {
     // 静态资源
     for ele in epub.assets_mut() {
         let data = ele.data_mut().ok_or(IError::Unknown)?.to_vec();
-        builder = builder.add_assets(ele.file_name(), data);
+        if !ele.media_type.contains("font") {
+            // 暂时不转换字体文件
+            builder = builder.add_assets(ele.file_name(), data);
+        }
     }
     // 添加文本
     for (html, _) in chap_temp {
@@ -765,7 +768,7 @@ mod tests {
         adapter::core::convert_epub_html_img,
         common::IError,
         mobi::core::MobiAssets,
-        prelude::{EpubBuilder, EpubHtml, EpubWriter, MobiReader, MobiWriter},
+        prelude::{read_from_file, EpubBuilder, EpubHtml, EpubWriter, MobiReader, MobiWriter},
     };
 
     #[test]
@@ -926,6 +929,31 @@ mod tests {
 </div>
   </body></html>"#,
             String::from_utf8(v).unwrap()
+        );
+    }
+
+    /**
+     * epub转mobi 不包括字体文件
+     */
+    #[test]
+    fn test_no_font() {
+        let name = if std::path::Path::new("target").exists() {
+            "target/cover_from_guide.epub"
+        } else {
+            "../target/cover_from_guide.epub"
+        };
+        let url = "https://github.com/user-attachments/files/23620295/05.zip";
+        crate::common::tests::download_epub_file(name, url);
+
+        let mut epub = read_from_file(name).unwrap();
+
+        let mobi = epub_to_mobi(&mut epub).unwrap();
+
+        assert_eq!(
+            0,
+            mobi.assets()
+                .filter(|f| f.file_name().contains("ttf"))
+                .count()
         );
     }
 }
