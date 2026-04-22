@@ -928,7 +928,6 @@ impl<T: Read + Seek + Sync + Send> EpubReaderTrait for EpubReader<T> {
                             } else {
                                 read_nav_xml(content.as_str(), book)?;
                             }
-                            book.update_chapter();
                         }
                     }
                 }
@@ -1242,12 +1241,21 @@ html
 
         assert_ne!(0, nav.len());
         assert_ne!("", nav[0].title());
+        println!(
+            "title = {:?}",
+            book.chapters_mut()
+                .map(|f| format!("{}-{}", f.title(), f.file_name()))
+                .collect::<Vec<String>>()
+        );
+
         let mut chap = book.chapters_mut();
+        assert_eq!(23, chap.len());
         assert_eq!(75, chap.next().unwrap().data_mut().unwrap().len());
 
         // println!("{}", String::from_utf8( chap.next().unwrap().data().unwrap().to_vec()).unwrap());
-        chap.next();
-        chap.next();
+        println!("title = {}", chap.next().unwrap().title());
+        println!("title = {}", chap.next().unwrap().title());
+
         let nt = chap.next().unwrap();
         println!("nt = {}", nt.title());
         assert_eq!(9343, nt.data_mut().unwrap().to_vec().len());
