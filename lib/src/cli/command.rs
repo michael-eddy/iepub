@@ -92,10 +92,10 @@ fn create_dir(path: &str) {
         };
     }
 }
-
+#[allow(clippy::upper_case_acronyms)]
 enum OwnBook {
-    EPUB(EpubBook),
-    MOBI(MobiBook),
+    EPUB(Box<EpubBook>),
+    MOBI(Box<MobiBook>),
 }
 
 fn read_book(file: &str) -> IResult<OwnBook> {
@@ -105,7 +105,7 @@ fn read_book(file: &str) -> IResult<OwnBook> {
         .and_then(|mut f| iepub::prelude::check::is_epub(&mut f).map_err(|_| false))
         .unwrap_or(false)
     {
-        read_from_file(file).map(OwnBook::EPUB)
+        read_from_file(file).map(|s|OwnBook::EPUB(Box::new(s)))
     } else if std::fs::File::open(file)
         .map_err(|_| false)
         .and_then(|mut f| iepub::prelude::check::is_mobi(&mut f).map_err(|_| false))
@@ -114,7 +114,7 @@ fn read_book(file: &str) -> IResult<OwnBook> {
         let f = std::fs::File::open(file)?;
         iepub::prelude::MobiReader::new(f)
             .and_then(|mut f| f.load())
-            .map(OwnBook::MOBI)
+            .map(|s|OwnBook::MOBI(Box::new(s)))
     } else {
         Err(IError::UnsupportedArchive("不支持的格式"))
     }
@@ -298,17 +298,20 @@ pub(crate) mod epub {
                         msg!("loading book {ele}");
 
                         let f = read_book(ele.as_str()).unwrap();
-                        let mut epub_book = match f {
+                        let mut epub_book:Box<iepub::prelude::EpubBook> = match f {
                             OwnBook::EPUB(epub_book) => epub_book,
                             OwnBook::MOBI(mut mobi_book) => {
+
                                 msg!("converting mobi to epub, {}", ele);
-                                mobi_to_epub(&mut mobi_book).unwrap_or_else(|e| {
+                                let t = mobi_to_epub(&mut mobi_book).unwrap_or_else(|e| {
                                     exec_err!(
                                         "convert mobi {} to epub fail, reason: {:?}",
                                         ele.as_str(),
                                         e
                                     )
-                                })
+                                });
+
+                                Box::new(t)
                             }
                         };
                         msg!("adding book [{}]", epub_book.title());
@@ -1482,11 +1485,11 @@ pub(crate) mod mobi {
         },
         fn print_nav(&self, dec: i32, nav: &MobiNav, print_href: bool) {
             self.print_dec(dec);
-            // if print_href {
-            println!("{} id=[{}]", nav.title(), nav.id());
-            // } else {
-            //     println!("{}", nav.title());
-            // }
+            if print_href {
+                println!("{} id=[{}]", nav.title(), nav.id());
+            } else {
+                println!("{}", nav.title());
+            }
             for ele in nav.child() {
                 self.print_nav(dec + 2, ele, print_href);
             }

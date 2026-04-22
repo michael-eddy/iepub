@@ -14,7 +14,7 @@
 //! 子命令及其参数可以有多个，将会同时执行
 //!
 
-use std::{fmt::Display, isize, str::FromStr};
+use std::{fmt::Display, str::FromStr};
 
 use crate::exec_err;
 
@@ -138,7 +138,7 @@ impl std::fmt::Display for CommandOptionDef {
 // fn get_option_def(key: &str, def: &[OptionDef]) -> Option<OptionDef> {}
 
 /// 处理字符串，去除可能存在的引号
-fn trim_arg(value: &String) -> String {
+fn trim_arg(value: &str) -> String {
     if value.starts_with('\"') && value.ends_with('\"') {
         return String::from(&value[1..value.len() - 1]);
     }
@@ -146,7 +146,7 @@ fn trim_arg(value: &String) -> String {
         return String::from(&value[1..value.len() - 1]);
     }
     // 还有转义之类的，这里不考虑了，实在写不完了
-    value.clone()
+    value.to_string()
 }
 
 /// 首先解析全局参数，为了获取输入文件，才能确认后面可以有哪些子命令

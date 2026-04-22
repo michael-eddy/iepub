@@ -368,7 +368,7 @@ pub(crate) fn do_to_opf(book: &mut EpubBook, generator: &str) -> IResult<String>
     }
     xml.write_event(Event::Start(spine.borrow()))?;
     // 把封面放第一个 nav，导航第二个
-    if let Some(co) = book.cover_chapter() {
+    if let Some(_co) = book.cover_chapter() {
         xml.create_element("itemref")
             .with_attribute(("idref", "cover"))
             .write_empty()?;

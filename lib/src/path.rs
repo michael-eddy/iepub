@@ -5,8 +5,6 @@
 pub struct Path {
     /// 逐级路径
     paths: Vec<String>,
-    /// home目录
-    home: String,
     /// 分隔符
     sep: String,
 }
@@ -26,7 +24,6 @@ impl Path {
         Self {
             paths: Vec::new(),
             sep: sep.to_string(),
-            home: String::new(),
         }
         .join(path)
     }

@@ -46,7 +46,6 @@ mod commands {
         use crate::cli::command::epub::*;
 
         // 注册子命令
-      
         register_command!(
             GetCover,
             BookInfoGetter,
@@ -88,7 +87,7 @@ pub(crate) trait Command {
 
     // fn def()->arg::CommandOptionDef;
 }
-
+#[allow(clippy::upper_case_acronyms)]
 pub(crate) enum Book<'a> {
     EPUB(&'a mut EpubBook),
     MOBI(&'a mut MobiBook),
@@ -122,6 +121,7 @@ fn check_input_type(arg: &Arg) -> Option<(usize, String)> {
 
     None
 }
+#[allow(dead_code)]
 mod info {
     include!(concat!(env!("OUT_DIR"), "/version.rs"));
 }

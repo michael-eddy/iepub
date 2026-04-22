@@ -192,6 +192,7 @@ pub(crate) struct MOBIHeader {
     pub(crate) indx_record_offset: u32,
 }
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub(crate) enum EXTHRecordType {
     DrmServerId = 1,
     DrmCommerceId = 2,
@@ -241,6 +242,7 @@ pub(crate) enum EXTHRecordType {
     /// 固定为0?
     Kf8UnknownCount = 131,
     ///  "true"
+    #[default]
     Unknown1 = 132,
     /// As text
     DictionaryShortName = 200,
@@ -287,11 +289,6 @@ pub(crate) enum EXTHRecordType {
     Unknown9 = 542,
     ///  String 'I\x00n\x00M\x00e\x00m\x00o\x00r\x00y\x00' found in this record, for KindleGen V2.9 build 1029-0897292
     InMemory = 547,
-}
-impl Default for EXTHRecordType {
-    fn default() -> Self {
-        EXTHRecordType::Unknown1
-    }
 }
 impl EXTHRecordType {
     pub(crate) fn code(&self) -> u32 {

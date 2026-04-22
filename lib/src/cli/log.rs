@@ -6,6 +6,7 @@ pub(crate) fn set_enable_log(value: bool) {
 #[macro_export]
 macro_rules! msg {
     ( $($arg:tt)+) => {
+        #[allow(clippy::macro_metavars_in_unsafe)]
         unsafe{
             if $crate::cli::log::IS_LOG {
                 println!($($arg)+)

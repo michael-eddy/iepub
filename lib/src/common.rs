@@ -514,7 +514,7 @@ impl DateTimeFormater {
     // 判断是否是闰年
     //
     fn is_leap(year: u64) -> bool {
-        year % 4 == 0 && ((year % 100) != 0 || year % 400 == 0)
+        year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400))
     }
 }
 
@@ -678,6 +678,7 @@ pub fn get_css_content_url<T: AsRef<str> + ?Sized>(css: &T) -> Vec<&str> {
 
     res
 }
+#[allow(dead_code)]
 pub(crate) mod info {
     include!(concat!(env!("OUT_DIR"), "/version.rs"));
 }

@@ -240,7 +240,7 @@ pub(crate) fn generate_human_nav_xml(
 }
 
 fn generate_reader_nav_item_xml(
-    start: usize,
+    _start: usize,
     nav: &[MobiNav],
     pos_value: &HashMap<usize, usize>,
 ) -> Vec<u8> {
@@ -270,7 +270,7 @@ fn generate_reader_nav_item_xml(
             text.append(&mut t.as_bytes().to_vec());
 
             let mut n_text =
-                generate_reader_nav_item_xml(start + text.len(), ele.child().as_slice(), pos_value);
+                generate_reader_nav_item_xml(_start + text.len(), ele.child().as_slice(), pos_value);
             text.append(&mut n_text);
         }
     }

@@ -321,7 +321,7 @@ impl EpubHtml {
     }
 
     pub fn raw_data(&mut self) -> Option<&str> {
-        let (id, origin) = if let Some(index) = self._file_name.find('#') {
+        let (_id, origin) = if let Some(index) = self._file_name.find('#') {
             (
                 Some(&self._file_name[(index + 1)..]),
                 self._file_name[0..index].to_string(),
@@ -334,10 +334,11 @@ impl EpubHtml {
             for prefix in EpubHtml::PREFIXES.iter() {
                 // 添加 前缀再次读取
                 f = format!("{prefix}{origin}");
-                let s = self.reader.as_mut().unwrap();
-                let d = s.lock().unwrap().read_string(f.as_str());
-                if let Ok(data) = d {
-                    self.raw_data = Some(data);
+                if let Some(mut s) = self.reader.as_mut().and_then(|m| m.lock().ok()) {
+                    let d = s.read_string(f.as_str());
+                    if let Ok(data) = d {
+                        self.raw_data = Some(data);
+                    }
                 }
             }
         }
@@ -443,25 +444,29 @@ impl EpubAssets {
 
     pub fn data_mut(&mut self) -> Option<&[u8]> {
         let mut f = String::from(self._file_name.as_str());
-        if self._data.is_none() && self.reader.is_some() && !f.is_empty() {
-            if self._data.is_none() && self.reader.is_some() && !f.is_empty() {
-                for prefix in EpubHtml::PREFIXES.iter() {
-                    let s = self.reader.as_mut().unwrap();
-                    // 添加 前缀再次读取
-                    f = format!("{prefix}{}", self._file_name);
+        if self._data.is_none()
+            && self.reader.is_some()
+            && !f.is_empty()
+            && self._data.is_none()
+            && self.reader.is_some()
+            && !f.is_empty()
+        {
+            for prefix in EpubHtml::PREFIXES.iter() {
+                let s = self.reader.as_mut().unwrap();
+                // 添加 前缀再次读取
+                f = format!("{prefix}{}", self._file_name);
+                let d = s.lock().unwrap().read_file(f.as_str());
+                if let Ok(v) = d {
+                    self.set_data(v);
+                    break;
+                }
+                // 有的文件名被url编码了，所以这里加一个解码后的读取
+                if let Ok(fname) = urldecode_enhanced(self._file_name.as_str()) {
+                    f = format!("{prefix}{}", fname);
                     let d = s.lock().unwrap().read_file(f.as_str());
                     if let Ok(v) = d {
                         self.set_data(v);
                         break;
-                    }
-                    // 有的文件名被url编码了，所以这里加一个解码后的读取
-                    if let Ok(fname) = urldecode_enhanced(self._file_name.as_str()) {
-                        f = format!("{prefix}{}", fname);
-                        let d = s.lock().unwrap().read_file(f.as_str());
-                        if let Ok(v) = d {
-                            self.set_data(v);
-                            break;
-                        }
                     }
                 }
             }
@@ -481,14 +486,12 @@ impl EpubAssets {
         let mut f: String = self._file_name.clone();
         if self.reader.is_some() && !f.is_empty() {
             for prefix in EpubHtml::PREFIXES.iter() {
-                let s = self.reader.as_mut().unwrap();
-                f = format!("{prefix}{}", self._file_name);
-                let d: Result<(), IError> = s
-                    .lock()
-                    .unwrap()
-                    .read_to_path(f.as_str(), file_path.as_ref());
-                if d.is_ok() {
-                    break;
+                if let Some(mut s) = self.reader.as_mut().and_then(|m| m.lock().ok()) {
+                    f = format!("{prefix}{}", self._file_name);
+                    let d: Result<(), IError> = s.read_to_path(f.as_str(), file_path.as_ref());
+                    if d.is_ok() {
+                        break;
+                    }
                 }
             }
         }
@@ -722,7 +725,7 @@ impl EpubBook {
 
 // 元数据
 impl EpubBook {
-    pub(crate) fn toc(&self) -> Option<&EpubAssets> {
+    pub fn toc(&self) -> Option<&EpubAssets> {
         self.toc.as_ref()
     }
 
@@ -850,7 +853,7 @@ impl EpubBook {
         self.assets.iter_mut()
     }
 
-    pub fn remove_assets(&mut self, index: usize)->EpubAssets {
+    pub fn remove_assets(&mut self, index: usize) -> EpubAssets {
         self.assets.remove(index)
     }
 

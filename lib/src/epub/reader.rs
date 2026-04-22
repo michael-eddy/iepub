@@ -166,12 +166,8 @@ fn read_meta_xml(
             }
             Ok(Event::Text(txt)) => {
                 if !parent.is_empty() {
-                    match parent[parent.len() - 1].as_str() {
-                        _ => {
-                            reading_text = true;
-                            text.push_str(txt.decode().map_err(IError::Encoding)?.deref());
-                        }
-                    }
+                    reading_text = true;
+                    text.push_str(txt.decode().map_err(IError::Encoding)?.deref());
                 }
             }
             Ok(Event::End(e)) => {
@@ -297,7 +293,7 @@ fn read_guide_xml(
                         // <reference href="cover.xhtml" title="cover" type="cover"/>
                         // 读取封面页的时候，不一定已经获取到了章节
 
-                        if let Some(t) = e
+                        if let Some(_t) = e
                             .try_get_attribute("type")
                             .ok()
                             .and_then(|f| f)
@@ -525,16 +521,8 @@ fn read_opf_xml(xml: &str, book: &mut EpubBook) -> IResult<()> {
                 }
                 _ => {}
             },
-            Ok(Event::Empty(e)) => match e.name().as_ref() {
-                _ => {}
-            },
-            Ok(Event::Text(_txt)) => {
-                if !parent.is_empty() {
-                    match parent[parent.len() - 1].as_str() {
-                        _ => {}
-                    }
-                }
-            }
+            Ok(Event::Empty(_e)) => {}
+            Ok(Event::Text(_txt)) => {}
             Ok(Event::End(e)) => {
                 if e.name().as_ref() == b"package" {
                     if parent.len() == 1 && parent[0] == "package" {
@@ -1088,7 +1076,6 @@ mod tests {
         epub::reader::{get_img_src, read_meta_xml},
         prelude::*,
     };
-    use std::fs;
 
     use super::{is_epub, read_nav_xml};
 
@@ -1433,9 +1420,9 @@ html
         assert!(book.cover().is_some());
     }
 
-    /// 
+    ///
     /// toc.ncx 不再作为assets的一部分，也就不对调用方公开了
-    /// 
+    ///
     #[test]
     fn test_remove_toc_from_assets() {
         let name = if std::path::Path::new("target").exists() {

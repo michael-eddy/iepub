@@ -63,8 +63,10 @@ impl PDBHeader {
         let mut record_info_list: Vec<PDBRecordInfo> = vec![];
         // 读取header
         for _ in 0..header.number_of_records {
-            let mut info = PDBRecordInfo::default();
-            info.offset = reader.read_u32()?;
+            let mut info = PDBRecordInfo {
+                offset: reader.read_u32()?,
+                ..Default::default()
+            };
 
             let a = reader.read_u32()?;
             // 取最高位的
@@ -85,8 +87,10 @@ impl MOBIDOCHeader {
     {
         reader.seek(SeekFrom::Start(offset))?;
 
-        let mut mo = MOBIDOCHeader::default();
-        mo.compression = reader.read_u16()?;
+        let mut mo = MOBIDOCHeader {
+            compression: reader.read_u16()?,
+            ..Default::default()
+        };
         reader.read_u16()?;
         mo.length = reader.read_u32()?;
         mo.record_count = reader.read_u16()?;
@@ -173,9 +177,11 @@ impl MOBIHeader {
 
 impl EXTHRecord {
     fn load<T: ReadCount>(reader: &mut T) -> IResult<Self> {
-        let mut v = Self::default();
-        v._type = reader.read_u32()?.into();
-        v.len = reader.read_u32()?;
+        let mut v = Self {
+            _type: reader.read_u32()?.into(),
+            len: reader.read_u32()?,
+            ..Default::default()
+        };
 
         reader.take((v.len - 8) as u64).read_to_end(&mut v.data)?;
 
@@ -230,13 +236,7 @@ impl EXTHHeader {
     fn get_cover_offset(&self) -> Option<u64> {
         self.record_list
             .iter()
-            .find(|x| {
-                if let super::common::EXTHRecordType::CoverOffset = x._type {
-                    true
-                } else {
-                    false
-                }
-            })
+            .find(|x| matches!(x._type, super::common::EXTHRecordType::CoverOffset))
             .map(|f| vec_u8_to_u64(&f.data))
             .filter(|f| f < &0xffffffff)
     }
@@ -244,13 +244,7 @@ impl EXTHHeader {
     fn get_thumbnail_offset(&self) -> Option<u64> {
         self.record_list
             .iter()
-            .find(|x| {
-                if let super::common::EXTHRecordType::ThumbOffset = x._type {
-                    true
-                } else {
-                    false
-                }
-            })
+            .find(|x| matches!(x._type, super::common::EXTHRecordType::ThumbOffset))
             .map(|f| vec_u8_to_u64(&f.data))
             .filter(|f| f < &0xffffffff)
     }
@@ -474,9 +468,10 @@ impl<T: Read + Seek> MobiReader<T> {
         if let Some(exth) = &self.exth_header {
             return exth.get_meta();
         }
-        let mut info = BookInfo::default();
-        info.title = title;
-        Ok(info)
+        Ok(BookInfo {
+            title,
+            ..Default::default()
+        })
     }
     /// record的第一个字节的offset
     ///

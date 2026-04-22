@@ -93,7 +93,7 @@ impl PDBHeader {
         writer.write_u32(self.app_info_id)?;
         writer.write_u32(self.sort_info_id)?;
 
-        writer.write("BOOKMOBI".as_bytes())?;
+        let _ = writer.write("BOOKMOBI".as_bytes())?;
 
         // writer.write_u32(self._type)?;
         // writer.write_u32(self.creator)?;
@@ -318,7 +318,7 @@ impl EXTHHeader {
     }
 
     fn write<T: Write + Seek>(&self, writer: &mut T) -> IResult<usize> {
-        writer.write("EXTH".as_bytes())?;
+        let _ = writer.write("EXTH".as_bytes())?;
         let pos = writer.stream_position()?;
         writer.write_u32(self.len)?;
 
@@ -327,7 +327,7 @@ impl EXTHHeader {
         for ele in &self.record_list {
             writer.write_u32(ele._type.code())?;
             writer.write_u32(ele.len)?;
-            writer.write(&ele.data)?;
+            let _ = writer.write(&ele.data)?;
         }
         let n = writer.stream_position()?;
 

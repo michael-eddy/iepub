@@ -100,8 +100,8 @@ pub(crate) fn generate_text_img_xml(html: &str, assets: &[String]) -> Vec<u8> {
             if let Some(v) = att.0 {
                 // 有src属性
                 let start = att.1;
-                for i in index..index + start {
-                    text.push(chars[i]);
+                for i in chars.iter().skip(index).take(start) {
+                    text.push(*i);
                 }
                 index += start + 1;
                 // 查找对应的 assets
@@ -116,16 +116,16 @@ pub(crate) fn generate_text_img_xml(html: &str, assets: &[String]) -> Vec<u8> {
                     index += len - 1;
                 } else {
                     // 如果没有，则继续原样添加
-                    for i in index - 1..index + len {
-                        text.push(chars[i]);
+                     for i in chars.iter().take(index + len).skip(index - 1)  {
+                        text.push(*i);
                     }
                     index += len;
                 }
                 continue;
             }
 
-            for i in index..(index + att.1) {
-                text.push(chars[i]);
+            for i in chars.iter().skip(index).take(att.1) {
+                text.push(*i);
             }
             index += att.1;
         } else {

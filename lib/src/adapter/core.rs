@@ -241,8 +241,8 @@ pub fn generate_text_img_xml<T: Fn(Vec<u8>) -> Vec<u8>>(
             if let Some(v) = att.0 {
                 // 有src属性
                 let start = att.1;
-                for i in index..index + start {
-                    text.push(chars[i]);
+                for i in chars.iter().skip(index).take(start) {
+                    text.push(*i);
                 }
                 index += start;
                 text.append(&mut attr.as_bytes()[1..].to_vec());

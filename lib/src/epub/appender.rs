@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use super::{
-    common, core,
+    common,
     html::{to_opf, to_toc_xml},
     writer::{self, EpubWriterTrait},
 };
