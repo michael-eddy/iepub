@@ -131,6 +131,7 @@ crate::cache_struct! {
         pub rel: LinkRel,
         pub file_type: String,
         pub href: String,
+        pub data: Vec<u8>,
     }
 }
 
@@ -219,7 +220,7 @@ impl EpubHtml {
                             content,
                             language,
                             direction,
-                            link,
+                            mut link,
                             style,
                             body_attribute,
                         }) = get_html_info(v.as_str(), id)
@@ -232,6 +233,30 @@ impl EpubHtml {
                                 self.set_language(lang);
                             }
                             self.direction = direction;
+                            // css link 需要读取内容
+                            for ele in link.iter_mut() {
+                                // ele.data = Vec::new();
+                                if ele.href.starts_with("https://")
+                                    || ele.href.starts_with("http://")
+                                {
+                                    // 远程的,不支持
+                                    // if let Ok(get) = reqwest::blocking::get(ele.href.as_str()).and_then(|f|f.bytes()) {
+                                    //     ele.data = get.to_vec();
+                                    // }
+                                } else {
+                                    // 本地的
+                                    let l = format!(
+                                        "{prefix}{}",
+                                        crate::path::Path::system(self._file_name.as_str())
+                                            .pop()
+                                            .join(ele.href.as_str())
+                                            .to_str()
+                                    );
+                                    if let Ok(vs) = reader.read_file(l.as_str()) {
+                                        ele.data = vs;
+                                    }
+                                }
+                            }
                             if !link.is_empty() {
                                 self.links = Some(link);
                             }
@@ -269,7 +294,8 @@ impl EpubHtml {
                 // 添加 前缀再次读取
                 f = format!("{prefix}{origin}");
                 let s = self.reader.as_mut().unwrap();
-                let d = s.lock().unwrap().read_string(f.as_str());
+                let mut r = s.lock().unwrap();
+                let d = r.read_string(f.as_str());
                 match d {
                     Ok(v) => {
                         if let Ok(html::HtmlInfo {
@@ -277,19 +303,46 @@ impl EpubHtml {
                             content,
                             language,
                             direction,
-                            link,
+                            mut link,
                             style,
                             body_attribute,
                         }) = get_html_info(v.as_str(), id)
                         {
                             if !title.is_empty() {
-                                self.set_title(&title);
+                                // self.set_title(&title);
+                                self.title = title;
                             }
-                            self.set_data(content);
+                            self._data = Some(content);
+                            // self.set_data(content);
                             if let Some(lang) = language {
-                                self.set_language(lang);
+                                // self.set_language(lang);
+                                self.lang = lang;
                             }
                             self.direction = direction;
+                            for ele in &mut link {
+                                // ele.data = Vec::new();
+                                if ele.href.starts_with("https://")
+                                    || ele.href.starts_with("http://")
+                                {
+                                    // 远程的,不支持
+                                    // if let Ok(get) = reqwest::blocking::get(ele.href.as_str()).and_then(|f|f.bytes()) {
+                                    //     ele.data = get.to_vec();
+                                    // }
+                                } else {
+                                    // 本地的
+                                    let l = format!(
+                                        "{prefix}{}",
+                                        crate::path::Path::system(self._file_name.as_str())
+                                            .pop()
+                                            .join(ele.href.as_str())
+                                            .to_str()
+                                    );
+                                    if let Ok(vs) = r.read_file(l.as_str()) {
+                                        ele.data = vs;
+                                    }
+                                }
+                            }
+
                             if !link.is_empty() {
                                 self.links = Some(link);
                             }

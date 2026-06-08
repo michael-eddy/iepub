@@ -342,6 +342,7 @@ mod tests {
                         rel: LinkRel::CSS,
                         file_type: String::new(),
                         href: "./1.css".to_string(),
+                        data: Vec::new()
                     }])
                     .with_data("<p>锻炼</p>".to_string().as_bytes().to_vec()),
             )

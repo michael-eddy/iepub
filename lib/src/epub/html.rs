@@ -511,6 +511,7 @@ pub(crate) fn get_html_info(html: &str, id: Option<&str>) -> IResult<HtmlInfo> {
                                     rel,
                                     file_type: String::new(),
                                     href: h,
+                                    data: Vec::new()
                                 });
                             }
                         }
@@ -702,6 +703,7 @@ mod test {
             href: String::from("href"),
             file_type: String::from("css"),
             rel: LinkRel::CSS,
+            data: Vec::new()
         };
 
         t.add_link(link);
@@ -775,6 +777,7 @@ ok
             rel: LinkRel::OTHER("t".to_string()),
             file_type: "()".to_string(),
             href: "1.css".to_string(),
+            data: Vec::new()
         });
         let html = to_html(&mut t, true, &Some(Direction::RTL));
 
@@ -826,6 +829,7 @@ ok
             href: String::from("href"),
             file_type: String::from("css"),
             rel: LinkRel::CSS,
+            data: Vec::new(),
         };
 
         t.add_link(link);

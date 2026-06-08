@@ -1,7 +1,7 @@
 use crate::{
     common::{self, IError, IResult},
     mobi::{builder::MobiBuilder, core::MobiAssets, image::get_attr_value},
-    prelude::{EpubBook, EpubBuilder, EpubHtml, EpubNav, MobiBook, MobiHtml, MobiNav},
+    prelude::{EpubBook, EpubBuilder, EpubHtml, EpubLink, EpubNav, LinkRel, MobiBook, MobiHtml, MobiNav},
 };
 
 fn to_epub_nav(mobi: &MobiNav, parent: &str) -> EpubNav {
@@ -205,6 +205,30 @@ fn convert_epub_html_img(html: &[u8], path: &str) -> Vec<u8> {
     generate_text_img_xml(html.as_slice(), "image", "xlink:href", v)
 }
 
+/// 将epub中的css转化为inline属性
+fn epub_css_inline(
+    html: &[u8],
+    css: &str,
+    links: Option<std::slice::Iter<'_, EpubLink>>,
+) -> Vec<u8> {
+    let t = String::from_utf8(html.to_vec()).unwrap();
+
+    let mut c = links
+        .map(|f| f.filter(|h| matches!(h.rel, LinkRel::CSS)).flat_map(|h| h.data.clone()).collect())
+        .and_then(|f| String::from_utf8(f).ok()).unwrap_or(String::new());
+    c.push_str(css);
+
+    if c.is_empty() || t.is_empty() {
+        return html.to_vec();
+    }
+
+    if let Ok(inline_fragment) = css_inline::inline_fragment(t.as_str(), c.as_str()) {
+        return inline_fragment.as_bytes().to_vec();
+    }
+
+    html.to_vec()
+}
+
 /// 修改xml片段中的img标签的src属性的路径
 pub fn generate_text_img_xml<T: Fn(Vec<u8>) -> Vec<u8>>(
     html: &[u8],
@@ -332,6 +356,9 @@ pub fn epub_to_mobi(epub: &mut EpubBook) -> IResult<MobiBook> {
                 MobiHtml::new(index).with_title(html.title()).with_data(
                     html.data_mut()
                         .map(|v| convert_epub_html_img(v, file_name.as_str()))
+                        .map(|v| {
+                            epub_css_inline(v.as_slice(), html.css().unwrap_or(""), html.links())
+                        })
                         // .unwrap_or_else(||Err(FromUtf8Error { bytes: Vec::n, error: e }))
                         .unwrap_or(Vec::new()),
                 ),
@@ -638,6 +665,7 @@ pub mod concat {
                         href: crate::path::Path::system(v.as_str())
                             .pop()
                             .releative(n.as_str()),
+                        data: Vec::new()
                     });
                 }
             }
