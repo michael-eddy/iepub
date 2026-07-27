@@ -3,6 +3,7 @@ use std::ops::Deref;
 use super::common;
 use crate::{common::get_media_type, prelude::*};
 use quick_xml::events::Event;
+use quick_xml::XmlVersion;
 
 /// 生成html
 pub(crate) fn to_html(chap: &mut EpubHtml, append_title: bool, dir: &Option<Direction>) -> String {
@@ -452,7 +453,7 @@ pub(crate) fn get_html_info(html: &str, id: Option<&str>) -> IResult<HtmlInfo> {
                     // 尝试获取lang
                     if let Ok(href) = body.try_get_attribute("lang") {
                         if let Some(h) = href.map(|f| {
-                            f.unescape_value()
+                            f.normalized_value(XmlVersion::Implicit1_0)
                                 .map_or_else(|_| String::new(), |v| v.to_string())
                         }) {
                             lang = Some(h);
@@ -460,7 +461,7 @@ pub(crate) fn get_html_info(html: &str, id: Option<&str>) -> IResult<HtmlInfo> {
                     }
                     if let Ok(href) = body.try_get_attribute("xml:lang") {
                         if let Some(h) = href.map(|f| {
-                            f.unescape_value()
+                            f.normalized_value(XmlVersion::Implicit1_0)
                                 .map_or_else(|_| String::new(), |v| v.to_string())
                         }) {
                             lang = Some(h);
@@ -468,7 +469,7 @@ pub(crate) fn get_html_info(html: &str, id: Option<&str>) -> IResult<HtmlInfo> {
                     }
                     if let Ok(href) = body.try_get_attribute("dir") {
                         if let Some(h) = href.map(|f| {
-                            f.unescape_value()
+                            f.normalized_value(XmlVersion::Implicit1_0)
                                 .map_or_else(|_| String::new(), |v| v.to_string())
                         }) {
                             direction = Some(Direction::from(h))
@@ -491,14 +492,14 @@ pub(crate) fn get_html_info(html: &str, id: Option<&str>) -> IResult<HtmlInfo> {
                         // 读取link标签
                         if let Ok(href) = body.try_get_attribute("href") {
                             if let Some(h) = href.map(|f| {
-                                f.unescape_value()
+                                f.normalized_value(XmlVersion::Implicit1_0)
                                     .map_or_else(|_| String::new(), |v| v.to_string())
                             }) {
                                 let mut rel = LinkRel::CSS;
 
                                 if let Ok(href) = body.try_get_attribute("rel") {
                                     if let Some(h) = href.map(|m| {
-                                        m.unescape_value()
+                                        m.normalized_value(XmlVersion::Implicit1_0)
                                             .map_or_else(|_| String::new(), |v| v.to_string())
                                     }) {
                                         if h != "stylesheet" {
@@ -511,7 +512,7 @@ pub(crate) fn get_html_info(html: &str, id: Option<&str>) -> IResult<HtmlInfo> {
                                     rel,
                                     file_type: String::new(),
                                     href: h,
-                                    data: Vec::new()
+                                    data: Vec::new(),
                                 });
                             }
                         }
@@ -529,7 +530,7 @@ pub(crate) fn get_html_info(html: &str, id: Option<&str>) -> IResult<HtmlInfo> {
                     }
                     body_data = reader
                         .read_text(body.to_end().to_owned().name())
-                        .map(|f| f.as_bytes().to_vec())
+                        .map(|f| f.to_vec())
                         .map_err(IError::Xml)
                         .ok();
                     if body_data.is_some() {
@@ -642,14 +643,16 @@ fn get_section_from_html(body: &str, id: &str) -> IResult<Vec<u8>> {
                         .try_get_attribute("id")
                         .map_err(|_e| IError::Unknown)
                         .and_then(|f| f.ok_or(IError::Unknown))
-                        .and_then(|f| f.unescape_value().map_err(IError::Xml))
-                        .map(|f| f.to_string())
+                        .map(|f| {
+                            f.normalized_value(XmlVersion::Implicit1_0)
+                                .map_or_else(|_| String::new(), |v| v.to_string())
+                        })
                         .map(|f| f == id)
                         .unwrap_or(false)
                 {
                     let v = reader
                         .read_text(body.to_end().to_owned().name())
-                        .map(|f| f.as_bytes().to_vec())
+                        .map(|f| f.to_vec())
                         .map_err(IError::Xml)
                         .ok();
 
@@ -703,7 +706,7 @@ mod test {
             href: String::from("href"),
             file_type: String::from("css"),
             rel: LinkRel::CSS,
-            data: Vec::new()
+            data: Vec::new(),
         };
 
         t.add_link(link);
@@ -777,7 +780,7 @@ ok
             rel: LinkRel::OTHER("t".to_string()),
             file_type: "()".to_string(),
             href: "1.css".to_string(),
-            data: Vec::new()
+            data: Vec::new(),
         });
         let html = to_html(&mut t, true, &Some(Direction::RTL));
 

@@ -1,4 +1,5 @@
 use quick_xml::events::BytesStart;
+use quick_xml::XmlVersion;
 use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::fs::File;
@@ -50,7 +51,7 @@ fn get_opf_location(xml: &str) -> IResult<String> {
                 if e.name().as_ref() == b"rootfile" {
                     if let Ok(path) = e.try_get_attribute("full-path") {
                         return match path.map(|f| {
-                            f.unescape_value()
+                            f.normalized_value(XmlVersion::Implicit1_0)
                                 .map_or_else(|_| String::new(), |v| v.to_string())
                         }) {
                             Some(v) => Ok(v),
@@ -122,7 +123,7 @@ fn read_meta_xml(
                             .ok()
                             .and_then(|f| f)
                             .map(|f| {
-                                f.unescape_value()
+                                f.normalized_value(XmlVersion::Implicit1_0)
                                     .map_or_else(|_| String::new(), |v| v.to_string())
                             })
                     {
@@ -270,14 +271,14 @@ fn read_guide_xml(
                         .ok()
                         .and_then(|f| f)
                         .map(|f| {
-                            f.unescape_value()
+                            f.normalized_value(XmlVersion::Implicit1_0)
                                 .map_or_else(|_| String::new(), |v| v.to_string())
                         })
                         .filter(|f| f == "cover")
                     {
                         if let Some(href) =
                             e.try_get_attribute("href").ok().and_then(|f| f).map(|f| {
-                                f.unescape_value()
+                                f.normalized_value(XmlVersion::Implicit1_0)
                                     .map_or_else(|_| String::new(), |v| v.to_string())
                             })
                         {
@@ -298,14 +299,14 @@ fn read_guide_xml(
                             .ok()
                             .and_then(|f| f)
                             .map(|f| {
-                                f.unescape_value()
+                                f.normalized_value(XmlVersion::Implicit1_0)
                                     .map_or_else(|_| String::new(), |v| v.to_string())
                             })
                             .filter(|f| f == "cover")
                         {
                             if let Some(href) =
                                 e.try_get_attribute("href").ok().and_then(|f| f).map(|f| {
-                                    f.unescape_value()
+                                    f.normalized_value(XmlVersion::Implicit1_0)
                                         .map_or_else(|_| String::new(), |v| v.to_string())
                                 })
                             {
@@ -368,7 +369,7 @@ fn read_spine_xml(
                 if e.name().as_ref() == b"itemref" {
                     if let Ok(href) = e.try_get_attribute("idref") {
                         if let Some(h) = href.map(|f| {
-                            f.unescape_value()
+                            f.normalized_value(XmlVersion::Implicit1_0)
                                 .map_or_else(|_| String::new(), |v| v.to_string())
                         }) {
                             let xhtml = assets
@@ -423,22 +424,34 @@ fn read_manifest_xml(
                         for attr in e.attributes().flatten() {
                             match attr.key.as_ref() {
                                 b"href" => {
-                                    let h = attr.unescape_value().unwrap_or_default().to_string();
+                                    let h = attr
+                                        .normalized_value(XmlVersion::Implicit1_0)
+                                        .unwrap_or_default()
+                                        .to_string();
                                     a.set_file_name(h.as_str());
                                 }
                                 b"id" => {
-                                    let h = attr.unescape_value().unwrap_or_default().to_string();
+                                    let h = attr
+                                        .normalized_value(XmlVersion::Implicit1_0)
+                                        .unwrap_or_default()
+                                        .to_string();
                                     if h.eq_ignore_ascii_case("cover") {
                                         is_cover = true;
                                     }
                                     a.set_id(h.as_str());
                                 }
                                 b"media-type" => {
-                                    let h = attr.unescape_value().unwrap_or_default().to_string();
+                                    let h = attr
+                                        .normalized_value(XmlVersion::Implicit1_0)
+                                        .unwrap_or_default()
+                                        .to_string();
                                     a.media_type = h;
                                 }
                                 b"properties" => {
-                                    let h = attr.unescape_value().unwrap_or_default().to_string();
+                                    let h = attr
+                                        .normalized_value(XmlVersion::Implicit1_0)
+                                        .unwrap_or_default()
+                                        .to_string();
                                     if h.split_whitespace().any(|s| s == "cover-image") {
                                         is_cover = true;
                                     }
@@ -493,7 +506,10 @@ fn read_opf_xml(xml: &str, book: &mut EpubBook) -> IResult<()> {
                     parent.push("package".to_string());
                     for attr in e.attributes().flatten() {
                         if attr.key.as_ref() == b"version" {
-                            let ver = attr.unescape_value()?.trim().to_string();
+                            let ver = attr
+                                .normalized_value(XmlVersion::Implicit1_0)?
+                                .trim()
+                                .to_string();
                             if !ver.is_empty() {
                                 book.set_version(&ver);
                             } else {
@@ -635,7 +651,7 @@ fn read_nav_point_xml(
                 b"content" => {
                     if let Ok(src) = e.try_get_attribute("src") {
                         if let Some(h) = src.map(|f| {
-                            f.unescape_value()
+                            f.normalized_value(XmlVersion::Implicit1_0)
                                 .map_or_else(|_| String::new(), |v| v.to_string())
                         }) {
                             nav.set_file_name(&h);

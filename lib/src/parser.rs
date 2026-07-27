@@ -1,5 +1,5 @@
 use crate::common::{ContentItem, ContentType, IError, IResult};
-use quick_xml::{events::Event, reader::Reader};
+use quick_xml::{events::Event, reader::Reader, XmlVersion};
 
 /// HTML 解析器
 pub struct HtmlParser {
@@ -74,7 +74,7 @@ impl HtmlParser {
                     for attr in e.attributes().flatten() {
                         let key = String::from_utf8_lossy(attr.key.as_ref()).to_string();
                         let value = attr
-                            .unescape_value()
+                            .normalized_value(XmlVersion::Implicit1_0)
                             .unwrap_or(std::borrow::Cow::Borrowed(""))
                             .to_string();
                         item.add_attribute(key, value);
@@ -139,7 +139,7 @@ impl HtmlParser {
                     for attr in e.attributes().flatten() {
                         let key = String::from_utf8_lossy(attr.key.as_ref()).to_string();
                         let value = attr
-                            .unescape_value()
+                            .normalized_value(XmlVersion::Implicit1_0)
                             .unwrap_or(std::borrow::Cow::Borrowed(""))
                             .to_string();
                         item.add_attribute(key, value);
