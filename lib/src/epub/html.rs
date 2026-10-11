@@ -448,7 +448,7 @@ pub(crate) fn get_html_info(html: &str, id: Option<&str>) -> IResult<HtmlInfo> {
                 return Err(IError::Xml(e));
             }
             Ok(Event::Start(body)) => match body.name().as_ref() {
-                b"html" => {
+                "html" => {
                     parent.push("html");
                     // 尝试获取lang
                     if let Ok(href) = body.try_get_attribute("lang") {
@@ -476,18 +476,18 @@ pub(crate) fn get_html_info(html: &str, id: Option<&str>) -> IResult<HtmlInfo> {
                         }
                     }
                 }
-                b"head" => {
+                "head" => {
                     if parent.len() != 1 || parent[0] != "html" {
                         return Err(IError::Unknown);
                     }
                     parent.push("head");
                 }
-                b"style" => {
+                "style" => {
                     if parent.last().map(|f| f == &"head").unwrap_or(false) {
                         parent.push("style");
                     }
                 }
-                b"link" => {
+                "link" => {
                     if parent.last().map(|f| f == &"head").unwrap_or(false) {
                         // 读取link标签
                         if let Ok(href) = body.try_get_attribute("href") {
@@ -518,19 +518,19 @@ pub(crate) fn get_html_info(html: &str, id: Option<&str>) -> IResult<HtmlInfo> {
                         }
                     }
                 }
-                b"title" => {
+                "title" => {
                     if parent.len() == 2 && parent[0] == "html" && parent[1] == "head" {
                         parent.push("title");
                     }
                 }
-                b"body" => {
-                    let a = body.attributes_raw().to_vec();
+                "body" => {
+                    let a = body.attributes_raw().as_bytes().to_vec();
                     if !a.is_empty() {
                         body_attribute = Some(a);
                     }
                     body_data = reader
                         .read_text(body.to_end().to_owned().name())
-                        .map(|f| f.to_vec())
+                        .map(|f| f.as_bytes().to_vec())
                         .map_err(IError::Xml)
                         .ok();
                     if body_data.is_some() {
@@ -540,27 +540,27 @@ pub(crate) fn get_html_info(html: &str, id: Option<&str>) -> IResult<HtmlInfo> {
                 _ => {}
             },
             Ok(Event::End(e)) => match e.name().as_ref() {
-                b"title" => {
+                "title" => {
                     if !parent.is_empty() {
                         parent.remove(parent.len() - 1);
                     }
                 }
-                b"head" => {
+                "head" => {
                     if !parent.is_empty() {
                         parent.remove(parent.len() - 1);
                     }
                 }
-                b"body" => {
+                "body" => {
                     if !parent.is_empty() {
                         parent.remove(parent.len() - 1);
                     }
                 }
-                b"html" => {
+                "html" => {
                     if !parent.is_empty() {
                         parent.remove(parent.len() - 1);
                     }
                 }
-                b"style" => {
+                "style" => {
                     if parent.last().map(|f| f == &"style").unwrap_or(false) {
                         parent.remove(parent.len() - 1);
                     }
@@ -568,17 +568,18 @@ pub(crate) fn get_html_info(html: &str, id: Option<&str>) -> IResult<HtmlInfo> {
                 _ => {}
             },
             Ok(Event::Text(e)) => {
+                let t = e.into_inner();
                 if parent.len() == 3 && parent[2] == "title" {
-                    title.push_str(e.decode().map_err(IError::Encoding)?.deref());
+                    title.push_str(t.as_ref());
                 }
                 if parent.last().map(|f| f == &"style").unwrap_or(false) {
                     // css 样式，应该不会有转义代码出现，就不考虑了
-                    style.push_str(e.decode().map_err(IError::Encoding)?.deref());
+                    style.push_str(t.as_ref());
                 }
             }
             Ok(Event::GeneralRef(e)) => {
                 if parent.len() == 3 && parent[2] == "title" {
-                    let t = e.decode().map_err(IError::Encoding)?;
+                    let t = e.into_inner();
                     if t == "amp" {
                         title.push('&');
                     } else if t == "lt" {
@@ -644,8 +645,8 @@ fn get_section_from_html(body: &str, id: &str) -> IResult<Vec<u8>> {
     // 属性名可能带命名空间前缀，比较时要去掉
     let matched = |e: &BytesStart| {
         e.attributes().flatten().any(|a| {
-            crate::epub::reader::bare_name(a.key.as_ref()) == b"id"
-                && &*a.value == id.as_bytes()
+            crate::epub::reader::bare_name(a.key.as_ref()) == "id"
+                && a.value.as_ref() == id
         })
     };
     // 事件起始前的字节位置，回退到最近的 `<`，避免落在空白缩进上
@@ -667,7 +668,7 @@ fn get_section_from_html(body: &str, id: &str) -> IResult<Vec<u8>> {
                 return Ok(body.get(start..end).unwrap_or_default().as_bytes().to_vec());
             }
             Ok(Event::Start(e)) if matched(&e) => {
-                let name = e.name().as_ref().to_vec();
+                let name = e.name().as_ref().to_string();
                 let start = start_of(before);
                 let mut depth = 1usize;
                 let mut end = body.len();

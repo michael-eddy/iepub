@@ -36,10 +36,8 @@ macro_rules! read_from_zip {
 /// 生成器对 OPF / NCX / nav 使用的命名空间前缀并不固定，比较标签名时必须先去前缀，
 /// 否则带前缀的包文档会一个分支都进不去（jlreq 整本解析为空）。
 #[inline]
-pub(crate) fn bare_name(name: &[u8]) -> &[u8] {
-    name.split(|c| *c == b':')
-        .next_back()
-        .unwrap_or(name)
+pub(crate) fn bare_name(name: &str) -> &str {
+    name.rsplit(':').next().unwrap_or(name)
 }
 
 /// 按 `/` 与 `\` 同时切分，用于解析 zip 内部（EPUB 内）的路径
@@ -83,7 +81,7 @@ fn get_opf_location(xml: &str) -> IResult<String> {
                 return Err(IError::Xml(e));
             }
             Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
-                if bare_name(e.name().as_ref()) == b"rootfile" {
+                if bare_name(e.name().as_ref()) == "rootfile" {
                     if let Ok(path) = e.try_get_attribute("full-path") {
                         return match path.map(|f| {
                             f.normalized_value(XmlVersion::Implicit1_0)
@@ -105,10 +103,7 @@ fn create_meta(xml: &BytesStart) -> IResult<EpubMetaData> {
     let mut meta = EpubMetaData::default();
 
     for a in xml.attributes().flatten() {
-        meta.push_attr(
-            String::from_utf8(a.key.0.to_vec()).unwrap().as_str(),
-            String::from_utf8(a.value.to_vec()).unwrap().as_str(),
-        );
+        meta.push_attr(a.key.0, a.value.as_ref());
     }
     Ok(meta)
 }
@@ -141,7 +136,7 @@ fn read_meta_xml(
             }
             Ok(Event::Start(e)) => {
                 let name =
-                    String::from_utf8(bare_name(e.name().as_ref()).to_vec()).map_err(IError::Utf8)?;
+                    bare_name(e.name().as_ref()).to_string();
 
                 if name == "meta" {
                     if parent.len() != 2 || parent[1] != "metadata" {
@@ -157,7 +152,7 @@ fn read_meta_xml(
                     if let Some(event) = e
                         .attributes()
                         .flatten()
-                        .find(|f| bare_name(f.key.as_ref()) == b"event")
+                        .find(|f| bare_name(f.key.as_ref()) == "event")
                         .map(|f| {
                             f.normalized_value(XmlVersion::Implicit1_0)
                                 .map_or_else(|_| String::new(), |v| v.to_string())
@@ -174,7 +169,7 @@ fn read_meta_xml(
                 }
             }
             Ok(Event::Empty(e)) => {
-                if bare_name(e.name().as_ref()) == b"meta" {
+                if bare_name(e.name().as_ref()) == "meta" {
                     if parent.len() != 2 || parent[1] != "metadata" {
                         return invalid!("not valid opf meta empty");
                     } else {
@@ -187,7 +182,7 @@ fn read_meta_xml(
             }
             Ok(Event::GeneralRef(e)) => {
                 if reading_text {
-                    let t = e.decode().map_err(IError::Encoding)?;
+                    let t = e.into_inner();
                     if t == "amp" {
                         text.push('&');
                     } else if t == "lt" {
@@ -204,12 +199,12 @@ fn read_meta_xml(
             Ok(Event::Text(txt)) => {
                 if !parent.is_empty() {
                     reading_text = true;
-                    text.push_str(txt.decode().map_err(IError::Encoding)?.deref());
+                    text.push_str(txt.into_inner().as_ref());
                 }
             }
             Ok(Event::End(e)) => {
                 let name =
-                    String::from_utf8(bare_name(e.name().as_ref()).to_vec()).map_err(IError::Utf8)?;
+                    bare_name(e.name().as_ref()).to_string();
                 reading_text = false;
 
                 match name.as_str() {
@@ -298,13 +293,13 @@ fn read_guide_xml(
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                if bare_name(e.name().as_ref()) == b"reference" {
+                if bare_name(e.name().as_ref()) == "reference" {
                     // <reference href="cover.xhtml" title="cover" type="cover"/>
                     // 读取封面页的时候，不一定已经获取到了章节
                     if e
                         .attributes()
                         .flatten()
-                        .find(|f| bare_name(f.key.as_ref()) == b"type")
+                        .find(|f| bare_name(f.key.as_ref()) == "type")
                         .map(|f| {
                             f.normalized_value(XmlVersion::Implicit1_0)
                                 .map_or_else(|_| String::new(), |v| v.to_string())
@@ -315,7 +310,7 @@ fn read_guide_xml(
                         if let Some(href) = e
                             .attributes()
                             .flatten()
-                            .find(|f| bare_name(f.key.as_ref()) == b"href")
+                            .find(|f| bare_name(f.key.as_ref()) == "href")
                             .map(|f| {
                                 f.normalized_value(XmlVersion::Implicit1_0)
                                     .map_or_else(|_| String::new(), |v| v.to_string())
@@ -327,7 +322,7 @@ fn read_guide_xml(
                 }
             }
             Ok(Event::End(e)) => {
-                if bare_name(e.name().as_ref()) == b"guide" {
+                if bare_name(e.name().as_ref()) == "guide" {
                     break;
                 }
             }
@@ -391,21 +386,21 @@ fn read_spine_xml(
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                let tag = bare_name(e.name().as_ref()).to_vec();
-                if tag == b"itemref" {
+                let tag = bare_name(e.name().as_ref()).to_string();
+                if tag == "itemref" {
                     let mut idref = String::new();
                     let mut linear = String::new();
                     let mut properties = String::new();
                     for attr in e.attributes().flatten() {
-                        let key = bare_name(attr.key.as_ref()).to_vec();
+                        let key = bare_name(attr.key.as_ref()).to_string();
                         let value = attr
                             .normalized_value(XmlVersion::Implicit1_0)
                             .map_or_else(|_| String::new(), |f| f.to_string());
-                        if key == b"idref" {
+                        if key == "idref" {
                             idref = value;
-                        } else if key == b"linear" {
+                        } else if key == "linear" {
                             linear = value;
-                        } else if key == b"properties" {
+                        } else if key == "properties" {
                             properties = value;
                         }
                     }
@@ -459,7 +454,7 @@ fn read_spine_xml(
                 }
             }
             Ok(Event::End(e)) => {
-                if bare_name(e.name().as_ref()) == b"spine" {
+                if bare_name(e.name().as_ref()) == "spine" {
                     break;
                 }
             }
@@ -493,25 +488,25 @@ fn read_manifest_xml(
         match reader.read_event_into(&mut buf) {
             Ok(Event::End(e)) => {
                 // 注释、文本等都不能终止解析，只有 </manifest> 才退出
-                if bare_name(e.name().as_ref()) == b"manifest" {
+                if bare_name(e.name().as_ref()) == "manifest" {
                     break;
                 }
             }
             Ok(Event::Empty(e)) | Ok(Event::Start(e)) => {
                 match bare_name(e.name().as_ref()) {
-                    b"item" => {
+                    "item" => {
                         let mut a = EpubAssets::default();
                         let mut is_cover = false;
                         for attr in e.attributes().flatten() {
                             match bare_name(attr.key.as_ref()) {
-                                b"href" => {
+                                "href" => {
                                     let h = attr
                                         .normalized_value(XmlVersion::Implicit1_0)
                                         .unwrap_or_default()
                                         .to_string();
                                     a.set_file_name(h.as_str());
                                 }
-                                b"id" => {
+                                "id" => {
                                     let h = attr
                                         .normalized_value(XmlVersion::Implicit1_0)
                                         .unwrap_or_default()
@@ -521,21 +516,21 @@ fn read_manifest_xml(
                                     }
                                     a.set_id(h.as_str());
                                 }
-                                b"media-type" => {
+                                "media-type" => {
                                     let h = attr
                                         .normalized_value(XmlVersion::Implicit1_0)
                                         .unwrap_or_default()
                                         .to_string();
                                     a.media_type = h;
                                 }
-                                b"properties" => {
+                                "properties" => {
                                     let h = attr
                                         .normalized_value(XmlVersion::Implicit1_0)
                                         .unwrap_or_default()
                                         .to_string();
                                     a.set_properties(h.as_str());
                                 }
-                                b"fallback" => {
+                                "fallback" => {
                                     let h = attr
                                         .normalized_value(XmlVersion::Implicit1_0)
                                         .unwrap_or_default()
@@ -593,10 +588,10 @@ fn read_opf_xml(xml: &str, book: &mut EpubBook) -> IResult<()> {
                 return invalid!("err");
             }
             Ok(Event::Start(e)) => match bare_name(e.name().as_ref()) {
-                b"package" => {
+                "package" => {
                     parent.push("package".to_string());
                     for attr in e.attributes().flatten() {
-                        if bare_name(attr.key.as_ref()) == b"version" {
+                        if bare_name(attr.key.as_ref()) == "version" {
                             let ver = attr
                                 .normalized_value(XmlVersion::Implicit1_0)?
                                 .trim()
@@ -609,7 +604,7 @@ fn read_opf_xml(xml: &str, book: &mut EpubBook) -> IResult<()> {
                         }
                     }
                 }
-                b"metadata" => {
+                "metadata" => {
                     if parent.len() != 1 || parent[0] != "package" {
                         return invalid!("not valid opf metadata");
                     } else {
@@ -617,44 +612,44 @@ fn read_opf_xml(xml: &str, book: &mut EpubBook) -> IResult<()> {
                     }
                     read_meta_xml(&mut reader, book)?;
                 }
-                b"manifest" => {
+                "manifest" => {
                     read_manifest_xml(&mut reader, book, &mut assets)?;
                 }
-                b"spine" => {
+                "spine" => {
                     // spine 自身的属性在这里就读掉，read_spine_xml 拿到时已经在标签内部
                     for attr in e.attributes().flatten() {
-                        let key = bare_name(attr.key.as_ref()).to_vec();
+                        let key = bare_name(attr.key.as_ref()).to_string();
                         let value = attr
                             .normalized_value(XmlVersion::Implicit1_0)
                             .map_or_else(|_| String::new(), |f| f.to_string());
-                        if key == b"page-progression-direction" {
+                        if key == "page-progression-direction" {
                             if !value.is_empty() {
                                 book.set_direction(Direction::from(value));
                             }
-                        } else if key == b"toc" && !value.is_empty() {
+                        } else if key == "toc" && !value.is_empty() {
                             spine_toc = Some(value);
                         }
                     }
                     read_spine_xml(&mut reader, book, &mut assets, &spine_toc)?;
                 }
-                b"guide" => {
+                "guide" => {
                     read_guide_xml(&mut reader, book)?;
                 }
                 _ => {}
             },
             Ok(Event::Empty(e)) => {
                 // `<spine/>`：没有 itemref，但属性仍然要读
-                if bare_name(e.name().as_ref()) == b"spine" {
+                if bare_name(e.name().as_ref()) == "spine" {
                     for attr in e.attributes().flatten() {
-                        let key = bare_name(attr.key.as_ref()).to_vec();
+                        let key = bare_name(attr.key.as_ref()).to_string();
                         let value = attr
                             .normalized_value(XmlVersion::Implicit1_0)
                             .map_or_else(|_| String::new(), |f| f.to_string());
-                        if key == b"page-progression-direction" {
+                        if key == "page-progression-direction" {
                             if !value.is_empty() {
                                 book.set_direction(Direction::from(value));
                             }
-                        } else if key == b"toc" && !value.is_empty() {
+                        } else if key == "toc" && !value.is_empty() {
                             spine_toc = Some(value);
                         }
                     }
@@ -662,7 +657,7 @@ fn read_opf_xml(xml: &str, book: &mut EpubBook) -> IResult<()> {
             }
             Ok(Event::Text(_txt)) => {}
             Ok(Event::End(e)) => {
-                if bare_name(e.name().as_ref()) == b"package" {
+                if bare_name(e.name().as_ref()) == "package" {
                     if parent.len() == 1 && parent[0] == "package" {
                     } else {
                         // xml错误
@@ -804,17 +799,17 @@ fn read_nav_point_xml(
                 break;
             }
             Ok(Event::Start(e)) => match bare_name(e.name().as_ref()) {
-                b"navLabel" => {
+                "navLabel" => {
                     parent.push("navLavel".to_string());
                 }
-                b"text" => {
+                "text" => {
                     parent.push("text".to_string());
                 }
-                b"content" => {
+                "content" => {
                     if let Some(src) = e
                         .attributes()
                         .flatten()
-                        .find(|f| bare_name(f.key.as_ref()) == b"src")
+                        .find(|f| bare_name(f.key.as_ref()) == "src")
                         .map(|f| {
                             f.normalized_value(XmlVersion::Implicit1_0)
                                 .map_or_else(|_| String::new(), |v| v.to_string())
@@ -824,7 +819,7 @@ fn read_nav_point_xml(
                         nav.set_file_name(zip_join(root_path, src.as_str()));
                     }
                 }
-                b"navPoint" => {
+                "navPoint" => {
                     // 套娃了
                     let mut n = EpubNav::default();
                     read_nav_point_xml(reader, &mut n, root_path)?;
@@ -834,7 +829,7 @@ fn read_nav_point_xml(
             },
             Ok(Event::End(e)) => {
                 let name =
-                    String::from_utf8(bare_name(e.name().as_ref()).to_vec()).map_err(IError::Utf8)?;
+                    bare_name(e.name().as_ref()).to_string();
 
                 if name == "navPoint" {
                     break;
@@ -850,13 +845,13 @@ fn read_nav_point_xml(
             Ok(Event::Text(e)) => {
                 if parent.last().map(|f| f == "text").unwrap_or(false) {
                     // quick_xml 0.38.0 之后，对于被转义后的xml文本，会把文本拆成多段
-                    title.push_str(e.decode().map_err(IError::Encoding)?.deref());
+                    title.push_str(e.into_inner().as_ref());
                 }
             }
             Ok(Event::GeneralRef(e)) => {
                 // 当文本中出现 &amp;之类的转义时，amp会被放到这里
                 if parent.last().map(|f| f == "text").unwrap_or(false) {
-                    let t = e.decode().map_err(IError::Encoding)?;
+                    let t = e.into_inner();
                     if t == "amp" {
                         title.push('&');
                     } else if t == "lt" {
@@ -906,16 +901,16 @@ fn read_nav_xml(xml: &str, root_path: String, book: &mut EpubBook) -> IResult<()
                 return invalid!("err");
             }
             Ok(Event::Start(e)) => match bare_name(e.name().as_ref()) {
-                b"ncx" => {
+                "ncx" => {
                     parent.push("ncx".to_string());
                 }
-                b"navMap" => {
+                "navMap" => {
                     if parent.len() != 1 || parent[0] != "ncx" {
                         return invalid!("err nav 1");
                     }
                     parent.push("navMap".to_string());
                 }
-                b"navPoint" => {
+                "navPoint" => {
                     if parent.len() != 2 || parent[1] != "navMap" {
                         return invalid!("err nav 2");
                     }
@@ -927,7 +922,7 @@ fn read_nav_xml(xml: &str, root_path: String, book: &mut EpubBook) -> IResult<()
             },
             Ok(Event::End(e)) => {
                 let name =
-                    String::from_utf8(bare_name(e.name().as_ref()).to_vec()).map_err(IError::Utf8)?;
+                    bare_name(e.name().as_ref()).to_string();
 
                 if name == "navMap" {
                     break;
@@ -968,14 +963,14 @@ fn read_nav_xhtml(xhtml: &str, root_path: String, book: &mut EpubBook) -> IResul
     loop {
         match reader.read_event()? {
             Event::Start(e) => match bare_name(e.name().as_ref()) {
-                b"nav" => {
+                "nav" => {
                     if has_epub_type(&e, "toc") {
                         in_toc_nav = true;
                     }
                 }
-                b"ol" if in_toc_nav => ol_stack.push(Vec::new()),
-                b"li" if in_toc_nav => li_stack.push(EpubNav::default()),
-                b"a" if in_toc_nav => {
+                "ol" if in_toc_nav => ol_stack.push(Vec::new()),
+                "li" if in_toc_nav => li_stack.push(EpubNav::default()),
+                "a" if in_toc_nav => {
                     in_anchor = true;
                     anchor.clear();
                     if li_stack.is_empty() {
@@ -983,7 +978,7 @@ fn read_nav_xhtml(xhtml: &str, root_path: String, book: &mut EpubBook) -> IResul
                         li_stack.push(EpubNav::default());
                     }
                     for attr in e.attributes().flatten() {
-                        if bare_name(attr.key.as_ref()) == b"href" {
+                        if bare_name(attr.key.as_ref()) == "href" {
                             let raw = attr
                                 .normalized_value(XmlVersion::Implicit1_0)
                                 .map_or_else(|_| String::new(), |f| f.to_string());
@@ -994,12 +989,10 @@ fn read_nav_xhtml(xhtml: &str, root_path: String, book: &mut EpubBook) -> IResul
                         }
                     }
                 }
-                b"span" if in_toc_nav => {
+                "span" if in_toc_nav => {
                     for attr in e.attributes().flatten() {
-                        if bare_name(attr.key.as_ref()) == b"class"
-                            && String::from_utf8_lossy(&attr.value)
-                                .split_whitespace()
-                                .any(|f| f == "toc-label")
+                        if bare_name(attr.key.as_ref()) == "class"
+                            && attr.value.split_whitespace().any(|f| f == "toc-label")
                         {
                             in_label = true;
                             label.clear();
@@ -1009,7 +1002,7 @@ fn read_nav_xhtml(xhtml: &str, root_path: String, book: &mut EpubBook) -> IResul
                 _ => (),
             },
             Event::Text(e) => {
-                let text = e.decode().map_err(IError::Encoding)?;
+                let text = e.into_inner();
                 if in_label {
                     label.push_str(&text);
                 } else if in_anchor {
@@ -1022,8 +1015,8 @@ fn read_nav_xhtml(xhtml: &str, root_path: String, book: &mut EpubBook) -> IResul
                     continue;
                 }
                 match bare_name(e.name().as_ref()) {
-                    b"nav" => in_toc_nav = false,
-                    b"a" => {
+                    "nav" => in_toc_nav = false,
+                    "a" => {
                         in_anchor = false;
                         // `toc-label` 优先，缺失时才用 anchor 文本作为标题
                         if !anchor.trim().is_empty() {
@@ -1035,7 +1028,7 @@ fn read_nav_xhtml(xhtml: &str, root_path: String, book: &mut EpubBook) -> IResul
                         }
                         anchor.clear();
                     }
-                    b"span" => {
+                    "span" => {
                         if in_label {
                             if let Some(li) = li_stack.last_mut() {
                                 li.set_title(label.trim());
@@ -1044,7 +1037,7 @@ fn read_nav_xhtml(xhtml: &str, root_path: String, book: &mut EpubBook) -> IResul
                             in_label = false;
                         }
                     }
-                    b"li" => {
+                    "li" => {
                         if let Some(item) = li_stack.pop() {
                             match ol_stack.last_mut() {
                                 Some(layer) => layer.push(item),
@@ -1052,7 +1045,7 @@ fn read_nav_xhtml(xhtml: &str, root_path: String, book: &mut EpubBook) -> IResul
                             }
                         }
                     }
-                    b"ol" => {
+                    "ol" => {
                         if let Some(done) = ol_stack.pop() {
                             if let Some(parent) = li_stack.last_mut() {
                                 // 子目录在父 `<li>` 闭合之前结束（分级目录的常规写法）
@@ -1086,10 +1079,8 @@ fn has_epub_type(e: &BytesStart, value: &str) -> bool {
     e.attributes().any(|a| {
         if let Ok(attr) = a {
             // `epub:type` 的前缀由生成器决定，比较时要去掉；值本身可以是空格分隔的多个类型
-            bare_name(attr.key.as_ref()) == b"type"
-                && String::from_utf8_lossy(&attr.value)
-                    .split_whitespace()
-                    .any(|f| f == value)
+            bare_name(attr.key.as_ref()) == "type"
+                && attr.value.split_whitespace().any(|f| f == value)
         } else {
             false
         }
@@ -1259,10 +1250,10 @@ pub(crate) fn get_img_src(html: &[u8], tag: &str, attribute: &str) -> Option<Vec
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                if e.name().as_ref().eq_ignore_ascii_case(tag.as_bytes()) {
+                if e.name().as_ref().eq_ignore_ascii_case(tag) {
                     for attr in e.attributes().flatten() {
-                        if attr.key.as_ref().eq_ignore_ascii_case(attribute.as_bytes()) {
-                            return Some(attr.value.to_vec());
+                        if attr.key.as_ref().eq_ignore_ascii_case(attribute) {
+                            return Some(attr.value.as_bytes().to_vec());
                         }
                     }
                 }
